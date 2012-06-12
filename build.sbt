@@ -6,6 +6,7 @@ scalaVersion := "2.9.1"
 
 libraryDependencies ++= Seq(
     "org.specs2" %% "specs2" % "1.11" % "test",
+    "junit" % "junit" % "4.8",
 	"org.clapper" %% "grizzled-slf4j" % "0.6.6",
 	"ch.qos.logback" % "logback-core" % "0.9.24" % "compile",
 	"ch.qos.logback" % "logback-classic" % "0.9.24" % "compile",
