@@ -11,7 +11,7 @@ class NetworkSpec extends Specification {
 
 	"An empty document net" should {
 		
-		"return None when searching for documents containing a given token" in new emptyNetwork {
+		"return None when searching" in new emptyNetwork {
 			emptyNetwork search "query" must empty
 		}
 		
@@ -65,6 +65,10 @@ class NetworkSpec extends Specification {
 			network.search(bothToken) must contain (doc1, doc2).only
 		}
 	
+		"return both documents if query has two tokens, one in each document" in new twoDocumentNetwork {
+			network.search(doc1Token +" "+ doc2Token) must contain (doc1, doc2).only
+		}
+		
 		"return documents in order of relevance as a result of a search query" in new moreRelevantDocumentNetwork {
 			network.search(token1) must contain (doc1, doc2).inOrder.only
 			network.search(token2) must contain (doc2, doc1).inOrder.only
@@ -90,10 +94,11 @@ class NetworkSpec extends Specification {
 	
 	trait twoDocumentNetwork extends Scope {
 		lazy val lexis = new Lexis()
-		lazy val bothToken = "one"
+		lazy val doc1Token = "one"
 		lazy val doc2Token = "two"
-		lazy val doc1 = new Document(bothToken::Nil)
-		lazy val doc2 = new Document(bothToken::doc2Token::Nil)
+		lazy val bothToken = "both"	
+		lazy val doc1 = new Document(doc1Token::bothToken::Nil)
+		lazy val doc2 = new Document(doc2Token::bothToken::Nil)
 		lazy val network = new Network(lexis)
 		network.add(doc1)
 		network.add(doc2)

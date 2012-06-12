@@ -51,10 +51,6 @@ private[lexicology] sealed case class LexisNode(prev: LexisNode, next: ListBuffe
 	def index(token: String): Lexeme = {
 		assert(token.length > 0)
 
-		def getMatchingNextNode(ch: Char): Option[LexisNode] = next.find( _.ch == ch)
-		
-		def lastCharInToken(): Boolean = token.length == 1
-		
 		def newNextLexeme(ch: Char): Lexeme = {
 			val lexeme = Lexeme(this, ListBuffer[LexisNode](), ch, lexis)
 			next += lexeme
@@ -79,7 +75,7 @@ private[lexicology] sealed case class LexisNode(prev: LexisNode, next: ListBuffe
 		val head = token(0)
 		val tail = token.substring(1)
 		
-		return if (lastCharInToken)
+		return if (lastChar(token))
 			getMatchingNextNode(head) match {
 				case None => newNextLexeme(head)
 				case Some(lexeme @ Lexeme(_, _, _, _)) => lexeme
@@ -93,26 +89,34 @@ private[lexicology] sealed case class LexisNode(prev: LexisNode, next: ListBuffe
 			}
 	}
 
+	private def lastChar(token: String): Boolean = token.length == 1
+	
+	private def getMatchingNextNode(ch: Char): Option[LexisNode] = next.find( _.ch == ch)
+	
 	/**
 	 * Search forward through the "next" LexisNodes to find the given token.
 	 */
 	def find(token: String): Option[Lexeme] = {
-		log.debug("find(token: '" + token + "') on " + this);
-		log.debug("next=" + next)
+		log.debug("find(token: '"+ token +"') on "+ this);
 		assert(token.length > 0)
-		val node = next.find(_.ch == token(0))
+		
+		val head = token(0)
+		val tail = token.substring(1)
 
-		node match {
+		getMatchingNextNode(head) match {
 			case None => None
-			case Some(Lexeme(_, _, c, _)) => {
-				log.debug("found " + node + ", token='" + token + "'")
-				if (token.length == 1) node.asInstanceOf[Option[Lexeme]]
-				else node.get.find(token.substring(1))
+			case Some(lexeme @ Lexeme(_, _, _, _)) => {
+				if (lastChar(token)) 
+					Some(lexeme)
+				else 
+					lexeme.find(tail)
 			}
 
-			case Some(LexisNode(_, _, c, _)) => {
-				if (token.length == 1) None
-				else node.get.find(token.substring(1))
+			case Some(node @ LexisNode(_, _, _, _)) => {
+				if (lastChar(token)) 
+					None
+				else 
+					node.find(tail)
 			}
 		} 	
 	}
@@ -150,7 +154,7 @@ private[lexicology] sealed case class LexisNode(prev: LexisNode, next: ListBuffe
 		})
 		count
 	}
-
+	
 	/**
 	 * Return the String representation of this LexisNode
 	 */
