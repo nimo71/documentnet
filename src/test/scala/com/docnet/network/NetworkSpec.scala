@@ -69,9 +69,14 @@ class NetworkSpec extends Specification {
 			network.search(doc1Token +" "+ doc2Token) must contain (doc1, doc2).only
 		}
 		
-		"return documents in order of relevance as a result of a search query" in new moreRelevantDocumentNetwork {
+		"return documents in order of relevance by token frequency" in new tokenFrequencyDocumentNetwork {
 			network.search(token1) must contain (doc1, doc2).inOrder.only
 			network.search(token2) must contain (doc2, doc1).inOrder.only
+		}
+		
+		"return documents in order of relevance by token position" in new tokenPositionDocumentNetwork {
+			network.search(token1 +" "+ token2) must contain (doc1, doc2).inOrder.only
+			network.search(token2 +" "+ token1) must contain (doc2, doc1).inOrder.only
 		}
 	}
 	
@@ -104,7 +109,7 @@ class NetworkSpec extends Specification {
 		network.add(doc2)
 	}
 	
-	trait moreRelevantDocumentNetwork extends Scope {
+	trait tokenFrequencyDocumentNetwork extends Scope {
 		lazy val token1 = "one"
 		lazy val token2 = "two"
 		lazy val doc1 = new Document(token1::token1::token2::Nil)
@@ -113,5 +118,16 @@ class NetworkSpec extends Specification {
 		network.add(doc1)
 		network.add(doc2)
 	}
+	
+	trait tokenPositionDocumentNetwork extends Scope {
+		lazy val token1 = "one"
+		lazy val token2 = "two"
+		lazy val doc1 = new Document(token1::token2::Nil)
+		lazy val doc2 = new Document(token2::token1::Nil)
+		lazy val network = new Network(new Lexis())
+		network.add(doc1)
+		network.add(doc2)
+	}
+	
 	
 }

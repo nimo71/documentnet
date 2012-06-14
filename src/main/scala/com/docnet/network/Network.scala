@@ -9,13 +9,22 @@ class Network(val lexis: Lexis) {
 	val matrix = mutable.Map.empty[Int, mutable.Map[Document, Int]]
 	
 	def search(query: String): List[Document] = {
-		val docToWeightOption = lexis.find(query).map{ lexeme => matrix(lexeme.id) }
-		docToWeightOption match {
-			case None => List.empty[Document]
-			case Some(docToWeight) => {
-				docToWeight.toList sortBy { _._2 } map { _._1 } reverse
-			}
+		
+		def getDocumentsWithWeights(token: String): Option[Map[Document, Int]] = 
+				lexis.find(token).map{ lexeme => matrix(lexeme.id) }
+			
+		val results = mutable.Map.empty[Document, Int]
+		
+		query.split(' ').foreach { 
+			getDocumentsWithWeights(_).map { docsToWeights =>	
+				docsToWeights.foreach { docToWeight => 
+					val doc = docToWeight._1
+					val weight = docToWeight._2
+					results += (doc -> (results.getOrElse(doc, 0) + weight))
+				}
+			}	
 		}
+		results.toList sortBy { _._2 } map { _._1 } reverse
 	}
 	
 	def add(doc: Document) = 
