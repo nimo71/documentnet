@@ -4,86 +4,37 @@ import com.docnet.lexicology._
 import scala.collection._
 import grizzled.slf4j.Logger
 
-private[network] sealed abstract case class Node() 
-{
-	private val next = mutable.Map.empty[Node, Int] 
+private[network] sealed abstract case class Node() {
+	var connections = mutable.ListBuffer.empty[Connection]
 	
-	def connect(node: Node) {
-		val weight = next.getOrElse(node, 0) + 1
-		next(node) = weight 
+	def connect(to: Node) {
+		getConnection(to) match {
+			case Some(cxn) => {
+				connections -= cxn
+				connections += cxn.increment
+			}
+			case None => connections += new Connection(this, to, 1)
+		}
+	}
+	
+	def getConnection(to: Node): Option[Connection] = {
+		connections.find { _.to == to } 
 	}
 	
 	def fire(weight: Int): Map[Node, Int] = {
-		next.map { case (nextNode, nextWeight) =>
-			(nextNode -> nextWeight * weight)
+		val fired = mutable.Map.empty[Node, Int]
+		connections.foreach { cxn => 
+			fired += (cxn.to -> cxn.weight * weight)
 		}
+		fired.toMap
 	}
-}
-private case class DocumentNode(val document: Document) extends Node {
-	
-	override def equals(a: Any): Boolean = {
-		a match {
-			case DocumentNode(doc) => doc == document
-			case _ => false
-		}
-	}
-}
-private case class LexemeNode(val lexId: Int) extends Node {
-	
-//	override def equals(a: Any): Boolean = {
-//		a match {
-//			case LexemeNode(id) => id == lexId
-//			case _ => false
-//		}
-//	}
-	
-}
+} 
+private case class DocumentNode(val document: Document) extends Node
+private case class LexemeNode(val lexId: Int) extends Node 
 private[network] class RootNode(val lexis: Lexis) extends Node
 
-private class Firing {
-	val nodes = mutable.ListBuffer.empty[(Node, Int)]
-	
-	/** 
-	 * Return the weight fired into the given node
-	 */
-	def getWeight(node: Node): Int = {
-		nodes find { _._1 == node } match {
-			case Some((n, w)) => w
-			case None => 0
-		}
-	}
-	
-	def updateWeight(node: Node, weight: Int) {
-		val index = nodes findIndexOf { _._1 == node }
-		
-		if (index < 0) 
-			nodes += ((node, weight))
-		else {
-			val (n, w) = nodes(index)
-			nodes(index) = (n, w + weight)
-		} 
-	}
-	
-	def updateFired(fired: Map[Node, Int]) = {
-		fired foreach { case (firedNode, firedWeight) => 
-			this.updateWeight(firedNode, firedWeight)
-		}
-	}
-	
-	def results: List[Document] = {
-		val results = nodes.foldLeft(mutable.Map.empty[Document, Int])(
-				(acc, fire) => {
-					fire match {
-						case (DocumentNode(doc), weight) => {
-							acc(doc) = weight
-							acc
-						}
-						case _ => acc
-					}
-				})	
-				
-		results.toList sortBy { _._2 } map { _._1 } reverse
-	}
+private class Connection(val from: Node, val to: Node, val weight: Int) {
+	def increment = { new Connection(from, to, weight + 1)}
 }
 
 /**
@@ -95,35 +46,6 @@ class Network(val lexis: Lexis) {
 	
 	val root = new RootNode(lexis)
 	val nodes = mutable.ListBuffer.empty[Node]
-	
-	/**
-	 * Search the Network for Documents matching the given query
-	 */
-	def search(query: String): List[Document] = {
-		
-		val firing = new Firing()
-		
-		query.split(' ').foreach { token =>  
-			lexis.find(token).foreach { lexeme =>
-				findLexemeNodes(lexeme.id) foreach { node =>
-					
-					val firingWeight = firing.getWeight(node)	
-					val firedNextNodes = node.fire(firingWeight + 1);
-					firing.updateFired(firedNextNodes)
-				} 
-			} 
-		}
-		firing results
-	}
-	
-	private def findLexemeNodes(lexId: Int): List[Node] = {
-		nodes.filter { 
-			_ match {
-				case LexemeNode(id) => lexId == id
-				case _ => false
-			}
-		}.toList
-	} 
 	
 	/**
 	 * Add a Document to this Network
@@ -158,4 +80,67 @@ class Network(val lexis: Lexis) {
 		)
 	}
 
+	/**
+	 * Search the Network for Documents matching the given query
+	 */
+	def search(query: String): List[Document] = {
+		val firing = new Firing(this)
+		firing fire(query.split(' '))
+		firing results
+	}
+	
+	/**
+	 * Optionally retrieve a node in the network matching the given token 
+	 */
+	def getNode(token: String): Option[Node] = {
+		lexis.find(token).flatMap { lexeme => 
+			nodes.find { 
+				_ match {
+					case LexemeNode(l) => lexeme == l
+					case _ => false
+				}				
+			}
+		}
+	}
+}
+
+private class Firing(val network: Network) {
+	val fired = mutable.Map.empty[Node, Int] 
+	
+	def fire(tokens: Array[String]) {
+		tokens.foreach { token =>  
+			network.getNode(token).foreach { node =>
+				val weightToFire = fired.getOrElse(node, 0) + 1
+				node.fire(weightToFire).foreach { 
+					case (activated, weight) => 
+						fired(activated) = fired.getOrElse(activated, 0) + weight
+				}
+			}
+		}
+	} 
+	
+	/** 
+	 * Return the weight fired into the given node
+	 */
+	def getWeight(node: Node): Int = {
+		fired find { _._1 == node } match {
+			case Some((n, w)) => w
+			case None => 0
+		}
+	}
+	
+	def results: List[Document] = {
+		val results = fired.foldLeft(mutable.Map.empty[Document, Int])(
+				(acc, fire) => {
+					fire match {
+						case (DocumentNode(doc), weight) => {
+							acc(doc) = weight
+							acc
+						}
+						case _ => acc
+					}
+				})	
+				
+		results.toList sortBy { _._2 } map { _._1 } reverse
+	}
 }
