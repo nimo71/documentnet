@@ -29,8 +29,25 @@ private[network] sealed abstract case class Node() {
 		fired.toMap
 	}
 } 
-private case class DocumentNode(val document: Document) extends Node
-private case class LexemeNode(val lexId: Int) extends Node 
+
+private case class DocumentNode(val document: Document) extends Node {
+	override def equals(any: Any): Boolean = {
+		any match {
+			case DocumentNode(doc) => doc == document
+			case _ => false
+		}
+	}
+}
+
+private case class LexemeNode(val lexId: Int) extends Node {
+	override def equals(any: Any): Boolean = {
+		any match {
+			case LexemeNode(id) => lexId == id
+			case _ => false
+		}
+	}
+}
+
 private[network] class RootNode(val lexis: Lexis) extends Node
 
 private class Connection(val from: Node, val to: Node, val weight: Int) {
@@ -53,16 +70,23 @@ class Network(val lexis: Lexis) {
 	def add(document: Document) = {
 		val docNode = DocumentNode(document)
 		nodes += docNode
-		
 		var last: Node = root
-		document.tokens.foreach { token =>
-			val lexId = lexis.index(token).id
-			val lexNode = new LexemeNode(lexId)
-			
+		
+		def connect(lexNode: LexemeNode) {
 			lexNode.connect(docNode)
 			last.connect(lexNode)
 			nodes += lexNode
 			last = lexNode
+		}
+		
+		document.tokens.foreach { token =>		
+			findNode(token) match { 
+				case Some(lexNode @ LexemeNode(_))  => connect(lexNode)
+				case _ =>
+					val lexId = lexis.index(token).id
+					val lexNode = new LexemeNode(lexId)
+					connect(lexNode)
+			}
 		}
 	}
 	
@@ -92,13 +116,19 @@ class Network(val lexis: Lexis) {
 	/**
 	 * Optionally retrieve a node in the network matching the given token 
 	 */
-	def getNode(token: String): Option[Node] = {
-		lexis.find(token).flatMap { lexeme => 
-			nodes.find { 
-				_ match {
-					case LexemeNode(l) => lexeme == l
-					case _ => false
-				}				
+	def findNode(token: String): Option[Node] = {
+		val optionalLexeme = lexis.find(token)
+		optionalLexeme.flatMap { lexeme => findNode(lexeme) }
+	}
+	
+	/**
+	 * Optionally retrieve a node in the network matching the given lexeme
+	 */
+	def findNode(lexeme: Lexeme): Option[Node] = {
+		nodes.find {
+			_ match {
+				case LexemeNode(lexId) => lexId == lexeme.id
+				case _ => false
 			}
 		}
 	}
@@ -109,7 +139,7 @@ private class Firing(val network: Network) {
 	
 	def fire(tokens: Array[String]) {
 		tokens.foreach { token =>  
-			network.getNode(token).foreach { node =>
+			network.findNode(token).foreach { node =>
 				val weightToFire = fired.getOrElse(node, 0) + 1
 				node.fire(weightToFire).foreach { 
 					case (activated, weight) => 
