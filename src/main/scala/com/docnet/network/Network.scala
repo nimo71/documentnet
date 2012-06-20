@@ -75,7 +75,6 @@ class Network(val lexis: Lexis) {
 		def connect(lexNode: LexemeNode) {
 			lexNode.connect(docNode)
 			last.connect(lexNode)
-			nodes += lexNode
 			last = lexNode
 		}
 		
@@ -86,6 +85,7 @@ class Network(val lexis: Lexis) {
 					val lexId = lexis.index(token).id
 					val lexNode = new LexemeNode(lexId)
 					connect(lexNode)
+					nodes += lexNode
 			}
 		}
 	}
