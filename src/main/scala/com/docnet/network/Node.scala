@@ -4,36 +4,40 @@ import com.docnet.lexicology._
 import scala.collection._
 import grizzled.slf4j.Logger
 
-private[network] sealed abstract case class Node(val parent: Node) {
-	val connections = mutable.ListBuffer.empty[Connection]
+private[network] object Node {
 	
-	def connect(to: Node) {
-		getConnection(to) match {
+	def connect(from: Node, to: Node) {
+		from.getConnection(to) match {
 			case Some(cxn) => {
-				connections -= cxn
-				connections += cxn.increment
+				from.connections -= cxn
+				from.connections += Connection.increment(cxn)
 			}
-			case None => connections += new Connection(this, to, 1)
+			case None => from.connections += new Connection(from, to, 1)
 		}
 	}
 	
-	def getConnection(to: Node): Option[Connection] = {
-		connections.find { _.to == to } 
-	}
-	
-	def fire(value: Int): Map[Node, Int] = {
+	def fire(node: Node, value: Int): Map[Node, Int] = {
 		val fired = mutable.Map.empty[Node, Int]
-		connections.foreach { cxn => 
+		node.connections.foreach { cxn => 
 			fired(cxn.to) = fired.getOrElse(cxn.to, 0) + cxn.weight * value
 		}
 		fired.toMap
+	}
+	
+}
+
+private[network] sealed abstract case class Node(val parent: Node) {
+	val connections = mutable.ListBuffer.empty[Connection]
+	
+	def getConnection(to: Node): Option[Connection] = {
+		connections.find { _.to == to } 
 	}
 	
 	def cxnString(): String
 	
 } 
 
-private case class DocumentNode(val document: Document) extends Node(null) {
+private[network] case class DocumentNode(val document: Document) extends Node(null) {
 	
 	override def equals(any: Any): Boolean = {
 		any match {
@@ -49,7 +53,7 @@ private case class DocumentNode(val document: Document) extends Node(null) {
 	def cxnString(): String = toString
 }
 
-private case class LexemeNode(
+private[network] case class LexemeNode(
 		val lexId: Int, 
 		override val parent: Node ) extends Node(parent) {
 	
@@ -60,22 +64,29 @@ private case class LexemeNode(
 		}
 	}
 	
-	override def hashCode(): Int = 41 * (41 + lexId.hashCode()) + parent.hashCode()
+	override def hashCode(): Int = { 
+		41 * (41 + lexId.hashCode()) + parent.hashCode()
+	}
 	
-	override def toString(): String =
+	override def toString(): String = {
 		"[LexemeNode lexId=%d, connections=%s]".format(lexId, connectionsString) 
+	}
 
-	private def connectionsString(): String =
+	private def connectionsString(): String = {
 		connections.foldLeft("")(
 				(acc, cxn) => {
 					acc +"[w:%d->%s]".format(cxn.weight, cxn.to.cxnString)
 				})
+	}
 				
-	def cxnString(): String = "[lexId=%d]".format(lexId)
-	
+	def cxnString(): String = { 
+		"[lexId=%d]".format(lexId)
+	}
 }
 
-private[network] class RootNode(val lexis: Lexis) extends Node(null) {
+private[network] class RootNode(val lexis: Lexis) extends Node(null) 
+{
 	override def toString(): String = "[RootNode]"
+
 	def cxnString(): String = toString
 }

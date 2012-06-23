@@ -1,7 +1,6 @@
 package com.docnet.network
 
 class Connection(val from: Node, val to: Node, val weight: Int) {
-	def increment = { new Connection(from, to, weight + 1)}
 	
 	override def equals(that: Any): Boolean = {
 		that match {
@@ -18,4 +17,10 @@ class Connection(val from: Node, val to: Node, val weight: Int) {
 	}
 	
 	override def toString(): String = "[Connection: -%d-> %s]".format(weight, to)
+}
+
+object Connection {
+	def increment(cxn: Connection): Connection = {
+		new Connection(cxn.from, cxn.to, cxn.weight + 1)
+	}
 }

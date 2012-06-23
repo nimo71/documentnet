@@ -4,11 +4,8 @@ import com.docnet.lexicology._
 import scala.collection._
 import grizzled.slf4j.Logger
 
-/**
- * Represent a set of Documents as a Network of the Lexemes that make up the 
- * Documents.
- */
-class Network(val lexis: Lexis) {
+class Network(val lexis: Lexis) 
+{
 	val log = Logger[this.type]
 	
 	val root = new RootNode(lexis)
@@ -17,52 +14,53 @@ class Network(val lexis: Lexis) {
 	def add(document: Document) {
 		val addNodes = mutable.ListBuffer.empty[Node]
 		val docNode = DocumentNode(document)
-		addNodes += docNode
+		
 		var last: Node = root
 		document.tokens.foreach { token =>	
-			val lexeme = lexis.index(token)
-			val lexNode = findNode(lexeme, addNodes) match { 
-				case Some(ln @ LexemeNode(_, _)) => ln
-				case _ =>
-					val lexId = lexis.index(token).id
-					val ln = new LexemeNode(lexId, docNode)
-					addNodes += ln
-					ln
-			}
-			lexNode.connect(docNode)
-			last.connect(lexNode)
+			val lexNode = getNodeForToken(token);
+			Node.connect(lexNode, docNode)
+			Node.connect(last, lexNode)
 			last = lexNode
 		}
 		
+		addNodes += docNode
 		nodes ++= addNodes
-	}
-	
-	private def findNode(lexeme: Lexeme, inNodes: mutable.ListBuffer[Node]): Option[Node] = {
-		inNodes.find {
-			_ match {
-				case LexemeNode(lexId, _) => lexId == lexeme.id
-				case _ => false
+		
+		def getNodeForToken(token: String): LexemeNode = {
+			val lexeme = lexis.index(token)
+			val lexNode = findNode(lexeme, addNodes) match { 
+				case Some(ln @ LexemeNode(_, _)) => ln
+				case _ =>  
+					val ln = createLexemeNode(docNode, token)
+					addNodes += ln
+					ln
 			}
+			return lexNode
+		}
+		
+		def findNode(lexeme: Lexeme, inNodes: mutable.ListBuffer[Node]): Option[Node] = 
+			inNodes.find {
+				_ match {
+					case LexemeNode(lexId, _) => lexId == lexeme.id
+					case _ => false
+				}
+			}
+		
+		def createLexemeNode(docNode: DocumentNode, token: String): LexemeNode = {
+			val lexId = lexis.index(token).id
+			return new LexemeNode(lexId, docNode)
 		}
 	}
 	
-	/**
-	 * 
-	 */
-	def tokens(): Set[String] = { 
+	def tokens(): Set[String] =
 		nodes.foldLeft(Set.empty[String]) (
 			(acc, node) => {
 				node match {
 					case LexemeNode(lexId, _) => acc + lexis.find(lexId).get.token
 					case _ => acc
 				}
-			}  
-		)
-	}
+			} )
 
-	/**
-	 * Search the Network for Documents matching the given query
-	 */
 	def search(query: String): List[Document] = {
 		val firing = new Firing(this)
 		firing fire(query.split(' '))
@@ -79,5 +77,5 @@ class Network(val lexis: Lexis) {
 				}.toList
 			case None => List.empty[Node]
 		}
-	}		
+	}
 }
