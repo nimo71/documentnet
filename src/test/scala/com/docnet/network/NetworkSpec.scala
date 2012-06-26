@@ -8,7 +8,7 @@ import org.specs2.runner.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class NetworkSpec extends Specification {
-
+	
 	"An empty document net" should {
 		
 		"return None when searching" in new emptyNetwork {
