@@ -1,0 +1,11 @@
+.DS_Store
+.cache
+.classpath
+.history
+.metadata/
+.project
+.scala_dependencies
+.settings/
+.target/
+bin/
+target/
